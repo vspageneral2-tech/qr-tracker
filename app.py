@@ -217,45 +217,54 @@ def generate_qr():
 # When someone scans the QR
 @app.route("/scan/<scan_id>")
 def scan_page(scan_id):
-    # Look up saved links for this QR; 404 if not found
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        cfg = conn.execute("SELECT * FROM qr_configs WHERE scan_id = ?", (scan_id,)).fetchone()
-    if not cfg:
-        abort(404)
-
-    qr_label = request.args.get("label") or cfg["qr_label"]
-
     client_ip = get_client_ip()
     geo = geolocate_ip(client_ip)
-
-    ua = parse_ua(request.user_agent.string or "")
-    device_family = ua.device.family or None
-    os_family = ua.os.family or None
-    browser_family = ua.browser.family or None
 
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
         c.execute("""
-            INSERT INTO scans (scan_id, qr_label, timestamp, ip, user_agent, device_family, os_family, browser_family, city, region, country, lat, lon)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO scans (scan_id, timestamp, ip, user_agent, city, region, country, lat, lon)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             scan_id,
-            qr_label,
-            datetime.utcnow().isoformat(),
+            datetime.now().isoformat(),
             client_ip,
             request.user_agent.string,
-            device_family,
-            os_family,
-            browser_family,
             geo["city"], geo["region"], geo["country"], geo["lat"], geo["lon"]
         ))
         conn.commit()
 
-    links_cfg = json.loads(cfg["links_json"]) if cfg["links_json"] else []
-    # Send through /click so we log which one was chosen
-    links = [{"text": l["text"], "url": url_for("click_link", scan_id=scan_id, link=l["target"])} for l in links_cfg]
-    return render_template("scan.html", links=links)
+        # fetch label + links
+        c.execute("SELECT qr_label, links_json FROM qr_configs WHERE scan_id=?", (scan_id,))
+        row = c.fetchone()
+        qr_label, links_json = (row or [None, ""])
+        links = []
+        try:
+            import json
+            links = json.loads(links_json) if links_json else []
+        except Exception:
+            pass
+
+    # If only 1 link → auto redirect
+    if len(links) == 1:
+        target = links[0]["target"]
+        # also log click
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute("INSERT INTO clicks (scan_id, link, timestamp) VALUES (?, ?, ?)",
+                      (scan_id, target, datetime.now().isoformat()))
+            conn.commit()
+        return redirect(target)
+
+    # Otherwise show landing page with multiple options
+    # Convert into clickable URLs
+    link_objs = [
+        {"text": l["text"], "url": url_for("click_link", scan_id=scan_id, link=l["target"])}
+        for l in links
+    ]
+    return render_template("scan.html", links=link_objs, qr_label=qr_label)
+
+
 
 # Log which link was clicked
 @app.route("/click")
@@ -388,19 +397,45 @@ def clear_clicks():
         conn.commit()
     return redirect(url_for("admin"))
 
+from flask import Response
+from datetime import datetime, timedelta
+import csv
+import io
+import json
+
+def _range_start_utc(days: int) -> str:
+    """Return ISO string (UTC) for start of range 'days' ago."""
+    dt = datetime.utcnow() - timedelta(days=days-1)  # include today
+    return dt.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
 
 @app.route("/analytics")
 def analytics():
+    # Query params
+    rng = request.args.get("range", "30")  # "7" | "30" | "90"
+    try:
+        days = int(rng)
+        if days not in (7, 30, 90):
+            days = 30
+    except Exception:
+        days = 30
+
+    focus_scan_id = request.args.get("scan_id")  # for per-link chart (optional)
+    start_iso = _range_start_utc(days)
+
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
 
-        # Totals
+        # Totals (within range)
         total_qrs = conn.execute("SELECT COUNT(*) AS c FROM qr_configs").fetchone()["c"]
-        total_scans = conn.execute("SELECT COUNT(*) AS c FROM scans").fetchone()["c"]
-        total_clicks = conn.execute("SELECT COUNT(*) AS c FROM clicks").fetchone()["c"]
+        total_scans = conn.execute("""
+            SELECT COUNT(*) AS c FROM scans WHERE timestamp >= ?
+        """, (start_iso,)).fetchone()["c"]
+        total_clicks = conn.execute("""
+            SELECT COUNT(*) AS c FROM clicks WHERE timestamp >= ?
+        """, (start_iso,)).fetchone()["c"]
 
-        # Per-QR scans & clicks (include QRs with zero activity)
-        per_qr = conn.execute("""
+        # Per-QR scans & clicks (within range), include QRs with zero activity
+        per_qr = conn.execute(f"""
             SELECT
               qc.scan_id,
               qc.qr_label,
@@ -409,58 +444,233 @@ def analytics():
               COALESCE(k.cnt, 0) AS clicks
             FROM qr_configs qc
             LEFT JOIN (
-              SELECT scan_id, COUNT(*) AS cnt FROM scans GROUP BY scan_id
+              SELECT scan_id, COUNT(*) AS cnt
+              FROM scans
+              WHERE timestamp >= ?
+              GROUP BY scan_id
             ) s USING (scan_id)
             LEFT JOIN (
-              SELECT scan_id, COUNT(*) AS cnt FROM clicks GROUP BY scan_id
+              SELECT scan_id, COUNT(*) AS cnt
+              FROM clicks
+              WHERE timestamp >= ?
+              GROUP BY scan_id
             ) k USING (scan_id)
             ORDER BY qc.created_at DESC
-        """).fetchall()
+        """, (start_iso, start_iso)).fetchall()
 
-        # Daily scans/clicks (last 14 days) using ISO date prefix
+        # Daily scans/clicks (range days, UTC date)
         daily_scans = conn.execute("""
             SELECT substr(timestamp,1,10) AS day, COUNT(*) AS cnt
             FROM scans
+            WHERE timestamp >= ?
             GROUP BY day
-            ORDER BY day DESC
-            LIMIT 14
-        """).fetchall()
+            ORDER BY day ASC
+        """, (start_iso,)).fetchall()
 
         daily_clicks = conn.execute("""
             SELECT substr(timestamp,1,10) AS day, COUNT(*) AS cnt
             FROM clicks
+            WHERE timestamp >= ?
             GROUP BY day
-            ORDER BY day DESC
-            LIMIT 14
+            ORDER BY day ASC
+        """, (start_iso,)).fetchall()
+
+        # List of QRs to populate dropdown
+        qr_list = conn.execute("""
+            SELECT scan_id, qr_label
+            FROM qr_configs
+            ORDER BY created_at DESC
         """).fetchall()
+
+        # Per-link analytics for a chosen QR (within range)
+        per_link_rows = []
+        link_map = {}
+        if focus_scan_id:
+            cfg = conn.execute("SELECT links_json FROM qr_configs WHERE scan_id = ?", (focus_scan_id,)).fetchone()
+            if cfg and cfg["links_json"]:
+                try:
+                    for l in json.loads(cfg["links_json"]):
+                        link_map[l["target"]] = l.get("text") or l["target"]
+                except Exception:
+                    pass
+
+            per_link = conn.execute("""
+                SELECT link, COUNT(*) AS cnt
+                FROM clicks
+                WHERE scan_id = ? AND timestamp >= ?
+                GROUP BY link
+                ORDER BY cnt DESC
+            """, (focus_scan_id, start_iso)).fetchall()
+
+            for r in per_link:
+                label = link_map.get(r["link"], r["link"])
+                per_link_rows.append({"link": r["link"], "label": label, "cnt": r["cnt"]})
 
     # Build view models
     per_qr_rows = []
     for r in per_qr:
-        d = dict(r)
-        d["created_local"] = time_ist(d["created_at"]) if d.get("created_at") else ""
-        scans = d.get("scans", 0) or 0
-        clicks = d.get("clicks", 0) or 0
-        d["ctr"] = f"{(clicks / scans * 100):.1f}%" if scans > 0 else "—"
-        per_qr_rows.append(d)
+        scans = (r["scans"] or 0)
+        clicks = (r["clicks"] or 0)
+        ctr = f"{(clicks / scans * 100):.1f}%" if scans > 0 else "—"
+        per_qr_rows.append({
+            "scan_id": r["scan_id"],
+            "qr_label": r["qr_label"],
+            "created_local": time_ist(r["created_at"]) if r["created_at"] else "",
+            "scans": scans,
+            "clicks": clicks,
+            "ctr": ctr,
+        })
 
-    # Overall CTR
     overall_ctr = f"{(total_clicks / total_scans * 100):.1f}%" if total_scans > 0 else "—"
 
-    # Pack daily rows as simple lists
+    # Serialize for charts
     daily_scans_list = [dict(x) for x in daily_scans]
     daily_clicks_list = [dict(x) for x in daily_clicks]
+    qr_list_simple = [dict(x) for x in qr_list]
 
     return render_template(
         "analytics.html",
+        range_days=days,
         total_qrs=total_qrs,
         total_scans=total_scans,
         total_clicks=total_clicks,
         overall_ctr=overall_ctr,
         per_qr_rows=per_qr_rows,
         daily_scans=daily_scans_list,
-        daily_clicks=daily_clicks_list
+        daily_clicks=daily_clicks_list,
+        qr_list=qr_list_simple,
+        focus_scan_id=focus_scan_id,
+        per_link_rows=per_link_rows
     )
+
+# ---------- CSV Exports ----------
+def _csv_response(filename: str, rows: list, headers: list):
+    si = io.StringIO()
+    cw = csv.writer(si)
+    cw.writerow(headers)
+    for r in rows:
+        cw.writerow([r.get(h, "") for h in headers])
+    out = si.getvalue()
+    resp = Response(out, mimetype="text/csv")
+    resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
+    return resp
+
+@app.route("/analytics/export/per_qr.csv")
+def export_per_qr_csv():
+    rng = request.args.get("range", "30")
+    try:
+        days = int(rng)
+        if days not in (7, 30, 90): days = 30
+    except Exception:
+        days = 30
+    start_iso = _range_start_utc(days)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT
+              qc.scan_id,
+              qc.qr_label,
+              qc.created_at,
+              COALESCE(s.cnt, 0) AS scans,
+              COALESCE(k.cnt, 0) AS clicks
+            FROM qr_configs qc
+            LEFT JOIN (SELECT scan_id, COUNT(*) AS cnt FROM scans WHERE timestamp >= ? GROUP BY scan_id) s USING (scan_id)
+            LEFT JOIN (SELECT scan_id, COUNT(*) AS cnt FROM clicks WHERE timestamp >= ? GROUP BY scan_id) k USING (scan_id)
+            ORDER BY qc.created_at DESC
+        """, (start_iso, start_iso)).fetchall()
+
+    payload = []
+    for r in rows:
+        scans = r["scans"] or 0
+        clicks = r["clicks"] or 0
+        ctr = (clicks / scans * 100) if scans > 0 else None
+        payload.append({
+            "scan_id": r["scan_id"],
+            "qr_label": r["qr_label"],
+            "created_at": r["created_at"],
+            "scans": scans,
+            "clicks": clicks,
+            "ctr_percent": f"{ctr:.1f}" if ctr is not None else ""
+        })
+    return _csv_response(f"per_qr_{days}d.csv", payload,
+                         ["scan_id", "qr_label", "created_at", "scans", "clicks", "ctr_percent"])
+
+@app.route("/analytics/export/daily.csv")
+def export_daily_csv():
+    rng = request.args.get("range", "30")
+    try:
+        days = int(rng)
+        if days not in (7, 30, 90): days = 30
+    except Exception:
+        days = 30
+    start_iso = _range_start_utc(days)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        scans = conn.execute("""
+            SELECT substr(timestamp,1,10) AS day, COUNT(*) AS scans
+            FROM scans WHERE timestamp >= ?
+            GROUP BY day ORDER BY day ASC
+        """, (start_iso,)).fetchall()
+        clicks = conn.execute("""
+            SELECT substr(timestamp,1,10) AS day, COUNT(*) AS clicks
+            FROM clicks WHERE timestamp >= ?
+            GROUP BY day ORDER BY day ASC
+        """, (start_iso,)).fetchall()
+
+    # merge by date
+    by_day = {}
+    for r in scans: by_day[r["day"]] = {"day": r["day"], "scans": r["scans"], "clicks": 0}
+    for r in clicks:
+        if r["day"] in by_day: by_day[r["day"]]["clicks"] = r["clicks"]
+        else: by_day[r["day"]] = {"day": r["day"], "scans": 0, "clicks": r["clicks"]}
+    rows = [by_day[k] for k in sorted(by_day.keys())]
+    return _csv_response(f"daily_{days}d.csv", rows, ["day", "scans", "clicks"])
+
+@app.route("/analytics/export/per_link.csv")
+def export_per_link_csv():
+    rng = request.args.get("range", "30")
+    try:
+        days = int(rng)
+        if days not in (7, 30, 90): days = 30
+    except Exception:
+        days = 30
+    start_iso = _range_start_utc(days)
+    scan_id = request.args.get("scan_id")
+    if not scan_id:
+        return Response("scan_id is required", status=400)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cfg = conn.execute("SELECT links_json FROM qr_configs WHERE scan_id=?", (scan_id,)).fetchone()
+        link_map = {}
+        if cfg and cfg["links_json"]:
+            try:
+                for l in json.loads(cfg["links_json"]):
+                    link_map[l["target"]] = l.get("text") or l["target"]
+            except Exception:
+                pass
+
+        rows = conn.execute("""
+            SELECT link, COUNT(*) AS clicks
+            FROM clicks
+            WHERE scan_id = ? AND timestamp >= ?
+            GROUP BY link
+            ORDER BY clicks DESC
+        """, (scan_id, start_iso)).fetchall()
+
+    payload = []
+    for r in rows:
+        payload.append({
+            "scan_id": scan_id,
+            "link_text": link_map.get(r["link"], r["link"]),
+            "link_url": r["link"],
+            "clicks": r["clicks"],
+        })
+    return _csv_response(f"per_link_{scan_id}_{days}d.csv", payload,
+                         ["scan_id", "link_text", "link_url", "clicks"])
+
 
 # -------------------
 # Run (local dev)

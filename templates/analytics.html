@@ -1,9 +1,39 @@
 {% extends "base.html" %}
 {% block title %}Analytics – Kurukshetra Smart Cards{% endblock %}
 
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
 {% block content %}
   <h1>Analytics</h1>
   <p class="muted">Overview of QR activity, scans, clicks, and CTR. Times shown in IST.</p>
+
+  <!-- Filters -->
+  <form method="get" action="/analytics" class="card" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+    <div>
+      <label><strong>Date Range</strong></label><br>
+      <select name="range" style="padding:8px;border-radius:6px;">
+        <option value="7"  {% if range_days == 7 %}selected{% endif %}>Last 7 days</option>
+        <option value="30" {% if range_days == 30 %}selected{% endif %}>Last 30 days</option>
+        <option value="90" {% if range_days == 90 %}selected{% endif %}>Last 90 days</option>
+      </select>
+    </div>
+    <div>
+      <label><strong>Per-link (Choose QR)</strong></label><br>
+      <select name="scan_id" style="padding:8px;border-radius:6px;">
+        <option value="">(None)</option>
+        {% for q in qr_list %}
+          <option value="{{ q.scan_id }}" {% if focus_scan_id == q.scan_id %}selected{% endif %}>
+            {{ q.qr_label or q.scan_id }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="align-self:flex-end;margin-bottom:6px;">
+      <button class="btn" type="submit">Apply</button>
+    </div>
+  </form>
 
   <!-- Summary cards -->
   <div class="card" style="display:flex; gap:16px; flex-wrap:wrap;">
@@ -26,8 +56,34 @@
     </div>
   </div>
 
+  <!-- Charts -->
+  <div class="card" style="display:flex; gap:16px; flex-wrap:wrap;">
+    <div class="card" style="flex:2; min-width:320px;">
+      <h3>Daily Scans vs Clicks</h3>
+      <canvas id="barDaily" height="200"></canvas>
+      <p style="margin-top:8px;">
+        <a class="btn" href="/analytics/export/daily.csv?range={{ range_days }}">Export Daily CSV</a>
+      </p>
+    </div>
+
+    <div class="card" style="flex:1; min-width:280px;">
+      <h3>Per-link Clicks{% if focus_scan_id %} ({{ focus_scan_id }}){% endif %}</h3>
+      <canvas id="pieLinks" height="200"></canvas>
+      {% if focus_scan_id %}
+        <p style="margin-top:8px;">
+          <a class="btn" href="/analytics/export/per_link.csv?range={{ range_days }}&scan_id={{ focus_scan_id }}">Export Per-Link CSV</a>
+        </p>
+      {% else %}
+        <p class="muted">Choose a QR above to see per-link clicks.</p>
+      {% endif %}
+    </div>
+  </div>
+
   <!-- Per-QR table -->
-  <h2 style="margin-top:24px;">Per-QR Performance</h2>
+  <h2>Per-QR Performance</h2>
+  <p>
+    <a class="btn" href="/analytics/export/per_qr.csv?range={{ range_days }}">Export Per-QR CSV</a>
+  </p>
   <table>
     <tr>
       <th>Label</th>
@@ -49,31 +105,57 @@
     {% endfor %}
   </table>
 
-  <!-- Daily activity -->
-  <h2>Daily Activity (Last 14 Days)</h2>
-  <div style="display:flex; gap:16px; flex-wrap:wrap;">
-    <div class="card" style="flex:1; min-width:300px;">
-      <h3>Daily Scans</h3>
-      <table>
-        <tr><th>Date</th><th>Scans</th></tr>
-        {% for d in daily_scans %}
-        <tr><td class="nowrap">{{ d.day }}</td><td>{{ d.cnt }}</td></tr>
-        {% endfor %}
-      </table>
-    </div>
-    <div class="card" style="flex:1; min-width:300px;">
-      <h3>Daily Clicks</h3>
-      <table>
-        <tr><th>Date</th><th>Clicks</th></tr>
-        {% for d in daily_clicks %}
-        <tr><td class="nowrap">{{ d.day }}</td><td>{{ d.cnt }}</td></tr>
-        {% endfor %}
-      </table>
-    </div>
-  </div>
-
   <p>
     <a class="btn" href="/admin">← Back to Admin</a>
     <a class="btn" href="/generate">Generate QR</a>
   </p>
+
+  <script>
+    // Data from server
+    const dailyScans = {{ daily_scans|tojson }};
+    const dailyClicks = {{ daily_clicks|tojson }};
+    const perLinkRows = {{ per_link_rows|tojson }};
+
+    // Build daily labels and values (align by date)
+    const daySet = new Set();
+    dailyScans.forEach(d => daySet.add(d.day));
+    dailyClicks.forEach(d => daySet.add(d.day));
+    const labels = Array.from(daySet).sort();
+
+    const scansMap = Object.fromEntries(dailyScans.map(d => [d.day, d.cnt]));
+    const clicksMap = Object.fromEntries(dailyClicks.map(d => [d.day, d.cnt]));
+
+    const scansVals = labels.map(d => scansMap[d] || 0);
+    const clicksVals = labels.map(d => clicksMap[d] || 0);
+
+    // Bar chart (Daily)
+    const ctxBar = document.getElementById('barDaily').getContext('2d');
+    new Chart(ctxBar, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Scans',  data: scansVals },
+          { label: 'Clicks', data: clicksVals }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { x: { ticks: { autoSkip: true, maxRotation: 45, minRotation: 0 } } }
+      }
+    });
+
+    // Pie chart (per-link)
+    const ctxPie = document.getElementById('pieLinks').getContext('2d');
+    const pieLabels = perLinkRows.map(r => r.label);
+    const pieValues = perLinkRows.map(r => r.cnt);
+    new Chart(ctxPie, {
+      type: 'pie',
+      data: {
+        labels: pieLabels,
+        datasets: [{ data: pieValues }]
+      },
+      options: { responsive: true }
+    });
+  </script>
 {% endblock %}
