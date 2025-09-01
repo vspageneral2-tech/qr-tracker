@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Analytics – Kurukshetra Smart Cards{% endblock %}
+
+{% block content %}
+  <h1>Analytics</h1>
+  <p class="muted">Overview of QR activity, scans, clicks, and CTR. Times shown in IST.</p>
+
+  <!-- Summary cards -->
+  <div class="card" style="display:flex; gap:16px; flex-wrap:wrap;">
+    <div class="card" style="flex:1; min-width:220px;">
+      <h3>Total QRs</h3>
+      <div style="font-size:24px; font-weight:700;">{{ total_qrs }}</div>
+    </div>
+    <div class="card" style="flex:1; min-width:220px;">
+      <h3>Total Scans</h3>
+      <div style="font-size:24px; font-weight:700;">{{ total_scans }}</div>
+    </div>
+    <div class="card" style="flex:1; min-width:220px;">
+      <h3>Total Clicks</h3>
+      <div style="font-size:24px; font-weight:700;">{{ total_clicks }}</div>
+    </div>
+    <div class="card" style="flex:1; min-width:220px;">
+      <h3>Overall CTR</h3>
+      <div style="font-size:24px; font-weight:700;">{{ overall_ctr }}</div>
+      <div class="muted">Clicks ÷ Scans</div>
+    </div>
+  </div>
+
+  <!-- Per-QR table -->
+  <h2 style="margin-top:24px;">Per-QR Performance</h2>
+  <table>
+    <tr>
+      <th>Label</th>
+      <th>Scan ID</th>
+      <th>Created (IST)</th>
+      <th>Scans</th>
+      <th>Clicks</th>
+      <th>CTR</th>
+    </tr>
+    {% for r in per_qr_rows %}
+    <tr>
+      <td>{{ r.qr_label or "" }}</td>
+      <td class="nowrap">{{ r.scan_id }}</td>
+      <td class="nowrap">{{ r.created_local }}</td>
+      <td>{{ r.scans }}</td>
+      <td>{{ r.clicks }}</td>
+      <td>{{ r.ctr }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <!-- Daily activity -->
+  <h2>Daily Activity (Last 14 Days)</h2>
+  <div style="display:flex; gap:16px; flex-wrap:wrap;">
+    <div class="card" style="flex:1; min-width:300px;">
+      <h3>Daily Scans</h3>
+      <table>
+        <tr><th>Date</th><th>Scans</th></tr>
+        {% for d in daily_scans %}
+        <tr><td class="nowrap">{{ d.day }}</td><td>{{ d.cnt }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    <div class="card" style="flex:1; min-width:300px;">
+      <h3>Daily Clicks</h3>
+      <table>
+        <tr><th>Date</th><th>Clicks</th></tr>
+        {% for d in daily_clicks %}
+        <tr><td class="nowrap">{{ d.day }}</td><td>{{ d.cnt }}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+
+  <p>
+    <a class="btn" href="/admin">← Back to Admin</a>
+    <a class="btn" href="/generate">Generate QR</a>
+  </p>
+{% endblock %}

@@ -1,19 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Saved QRs</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; vertical-align: top; }
-    th { background: #f0f0f0; }
-    img { border: 1px solid #ccc; }
-  </style>
-</head>
-<body>
-  <h1>Saved QRs</h1>
+{% extends "base.html" %}
+{% block title %}Saved QRs – Kurukshetra Smart Cards{% endblock %}
 
+{% block content %}
+  <h1>Saved QRs</h1>
   {% if items %}
   <table>
     <tr>
@@ -27,8 +16,8 @@
     {% for item in items %}
     <tr>
       <td>{{ item["qr_label"] or "" }}</td>
-      <td>{{ item["scan_id"] }}</td>
-      <td>{{ item["created_local"] }}</td>
+      <td class="nowrap">{{ item["scan_id"] }}</td>
+      <td class="nowrap">{{ item["created_local"] }}</td>
       <td>
         {% for l in item["links"] %}
           <div>{{ l["text"] }} → <a href="{{ l['target'] }}" target="_blank">{{ l["target"] }}</a></div>
@@ -36,10 +25,10 @@
       </td>
       <td>
         {% if item["qr_image_path"] %}
-          <img src="/{{ item['qr_image_path'] }}" alt="qr" style="width:120px;height:120px;">
+          <img src="/{{ item['qr_image_path'] }}" alt="qr" style="width:120px;height:120px;border:1px solid #ccc;border-radius:6px;">
         {% endif %}
       </td>
-      <td style="max-width:360px;overflow-wrap:anywhere">
+      <td style="max-width:420px;overflow-wrap:anywhere">
         <a href="{{ item['scan_url'] }}" target="_blank">{{ item['scan_url'] }}</a>
       </td>
     </tr>
@@ -49,10 +38,9 @@
     <p>No QRs have been created yet.</p>
   {% endif %}
 
-  <p style="margin-top:20px;">
-    <a href="/generate">Generate new QR</a> |
-    <a href="/">Home</a> |
-    <a href="/admin">Admin Dashboard</a>
+  <p>
+    <a class="btn" href="/generate">Generate new QR</a>
+    <a class="btn" href="/">Home</a>
+    <a class="btn" href="/admin">Admin</a>
   </p>
-</body>
-</html>
+{% endblock %}

@@ -1,19 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Admin Dashboard</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1, h2 { margin: 12px 0; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }
-    th, td { border: 1px solid #ccc; padding: 8px; vertical-align: top; }
-    th { background: #f7f7f7; }
-    .nowrap { white-space: nowrap; }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Admin Dashboard – Kurukshetra Smart Cards{% endblock %}
+
+{% block content %}
   <h1>Admin Dashboard</h1>
+<p>
+  <a class="btn" href="/analytics">📊 View Analytics</a>
+</p>
+  <p class="muted">
+    View and manage saved QRs, scan logs, and click logs. Times shown in IST.
+  </p>
 
   <!-- Saved QRs -->
   <h2>Saved QRs</h2>
@@ -26,6 +21,7 @@
       <th>Links</th>
       <th>QR Image</th>
       <th>Scan URL</th>
+      <th>Actions</th>
     </tr>
     {% for item in qr_items %}
     <tr>
@@ -39,11 +35,21 @@
       </td>
       <td>
         {% if item["qr_image_path"] %}
-          <img src="/{{ item['qr_image_path'] }}" alt="qr" style="width:120px;height:120px;border:1px solid #ccc;">
+          <img src="/{{ item['qr_image_path'] }}" alt="qr" style="width:120px;height:120px;border:1px solid #ccc;border-radius:6px;">
         {% endif %}
       </td>
       <td style="max-width:420px;overflow-wrap:anywhere">
         <a href="{{ item['scan_url'] }}" target="_blank">{{ item['scan_url'] }}</a>
+      </td>
+      <td>
+        <form class="inline" method="post" action="/admin/delete-qr/{{ item['scan_id'] }}" onsubmit="return confirm('Delete this saved QR (keep logs)?');">
+          <input type="hidden" name="delete_logs" value="0">
+          <button type="submit" class="warn btn">Delete QR (keep logs)</button>
+        </form>
+        <form class="inline" method="post" action="/admin/delete-qr/{{ item['scan_id'] }}" onsubmit="return confirm('Delete this saved QR AND ALL ITS LOGS? This cannot be undone.');">
+          <input type="hidden" name="delete_logs" value="1">
+          <button type="submit" class="danger btn">Delete QR + logs</button>
+        </form>
       </td>
     </tr>
     {% endfor %}
@@ -54,11 +60,14 @@
 
   <!-- Scans -->
   <h2>Scans</h2>
+  <form class="inline" method="post" action="/admin/clear-scans" onsubmit="return confirm('Delete ALL scan logs? This cannot be undone.');">
+    <button type="submit" class="danger btn">Clear ALL scans</button>
+  </form>
   <table>
     <tr>
       <th>ID</th><th>QR Label</th><th>Scan ID</th><th>Time (IST)</th><th>IP</th>
       <th>City</th><th>Region</th><th>Country</th><th>Lat</th><th>Lon</th>
-      <th>Device</th><th>OS</th><th>Browser</th><th>User Agent</th>
+      <th>Device</th><th>OS</th><th>Browser</th><th>User Agent</th><th>Action</th>
     </tr>
     {% for s in scans %}
     <tr>
@@ -76,24 +85,39 @@
       <td>{{ s["os_family"] or "" }}</td>
       <td>{{ s["browser_family"] or "" }}</td>
       <td style="max-width:420px;overflow-wrap:anywhere">{{ s["user_agent"] }}</td>
+      <td>
+        <form class="inline" method="post" action="/admin/delete-scan/{{ s['id'] }}" onsubmit="return confirm('Delete this scan row?');">
+          <button type="submit" class="warn btn">Delete</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </table>
 
   <!-- Clicks -->
   <h2>Clicks</h2>
+  <form class="inline" method="post" action="/admin/clear-clicks" onsubmit="return confirm('Delete ALL click logs? This cannot be undone.');">
+    <button type="submit" class="danger btn">Clear ALL clicks</button>
+  </form>
   <table>
-    <tr><th>ID</th><th>Scan ID</th><th>Link</th><th>Time (IST)</th></tr>
+    <tr><th>ID</th><th>Scan ID</th><th>Link</th><th>Time (IST)</th><th>Action</th></tr>
     {% for c in clicks %}
     <tr>
       <td>{{ c["id"] }}</td>
       <td class="nowrap">{{ c["scan_id"] }}</td>
       <td style="max-width:420px;overflow-wrap:anywhere">{{ c["link"] }}</td>
       <td class="nowrap">{{ c["time_local"] }}</td>
+      <td>
+        <form class="inline" method="post" action="/admin/delete-click/{{ c['id'] }}" onsubmit="return confirm('Delete this click row?');">
+          <button type="submit" class="warn btn">Delete</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </table>
 
-  <p><a href="/generate">Generate new QR</a> | <a href="/">Home</a></p>
-</body>
-</html>
+  <p>
+    <a class="btn" href="/generate">Generate new QR</a>
+    <a class="btn" href="/">Home</a>
+  </p>
+{% endblock %}

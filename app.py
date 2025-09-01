@@ -11,6 +11,7 @@ from ipaddress import ip_address
 from user_agents import parse as parse_ua
 from zoneinfo import ZoneInfo  # Python 3.9+
 
+
 # -------------------
 # Config
 # -------------------
@@ -328,6 +329,137 @@ def admin():
         clicks=clicks,
         qr_items=qr_items,          # <-- pass to template
         base_url=external_base_url()
+    )
+from flask import request
+
+# ---- Delete a saved QR (optionally also delete its logs) ----
+@app.route("/admin/delete-qr/<scan_id>", methods=["POST"])
+def delete_qr(scan_id):
+    delete_logs = request.form.get("delete_logs") == "1"
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        # remove QR image file if present
+        row = conn.execute("SELECT qr_image_path FROM qr_configs WHERE scan_id=?", (scan_id,)).fetchone()
+        if row and row[0]:
+            try:
+                # row[0] is like 'static/qrs/....png'
+                os.remove(row[0])
+            except Exception:
+                pass
+
+        # delete from qr_configs
+        c.execute("DELETE FROM qr_configs WHERE scan_id=?", (scan_id,))
+
+        if delete_logs:
+            c.execute("DELETE FROM scans  WHERE scan_id=?", (scan_id,))
+            c.execute("DELETE FROM clicks WHERE scan_id=?", (scan_id,))
+        conn.commit()
+    return redirect(url_for("admin"))
+
+# ---- Delete a single scan row by ID ----
+@app.route("/admin/delete-scan/<int:scan_row_id>", methods=["POST"])
+def delete_scan_row(scan_row_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM scans WHERE id=?", (scan_row_id,))
+        conn.commit()
+    return redirect(url_for("admin"))
+
+# ---- Delete a single click row by ID ----
+@app.route("/admin/delete-click/<int:click_row_id>", methods=["POST"])
+def delete_click_row(click_row_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM clicks WHERE id=?", (click_row_id,))
+        conn.commit()
+    return redirect(url_for("admin"))
+
+# ---- Bulk clear all scans ----
+@app.route("/admin/clear-scans", methods=["POST"])
+def clear_scans():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM scans")
+        conn.commit()
+    return redirect(url_for("admin"))
+
+# ---- Bulk clear all clicks ----
+@app.route("/admin/clear-clicks", methods=["POST"])
+def clear_clicks():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM clicks")
+        conn.commit()
+    return redirect(url_for("admin"))
+
+
+@app.route("/analytics")
+def analytics():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+
+        # Totals
+        total_qrs = conn.execute("SELECT COUNT(*) AS c FROM qr_configs").fetchone()["c"]
+        total_scans = conn.execute("SELECT COUNT(*) AS c FROM scans").fetchone()["c"]
+        total_clicks = conn.execute("SELECT COUNT(*) AS c FROM clicks").fetchone()["c"]
+
+        # Per-QR scans & clicks (include QRs with zero activity)
+        per_qr = conn.execute("""
+            SELECT
+              qc.scan_id,
+              qc.qr_label,
+              qc.created_at,
+              COALESCE(s.cnt, 0) AS scans,
+              COALESCE(k.cnt, 0) AS clicks
+            FROM qr_configs qc
+            LEFT JOIN (
+              SELECT scan_id, COUNT(*) AS cnt FROM scans GROUP BY scan_id
+            ) s USING (scan_id)
+            LEFT JOIN (
+              SELECT scan_id, COUNT(*) AS cnt FROM clicks GROUP BY scan_id
+            ) k USING (scan_id)
+            ORDER BY qc.created_at DESC
+        """).fetchall()
+
+        # Daily scans/clicks (last 14 days) using ISO date prefix
+        daily_scans = conn.execute("""
+            SELECT substr(timestamp,1,10) AS day, COUNT(*) AS cnt
+            FROM scans
+            GROUP BY day
+            ORDER BY day DESC
+            LIMIT 14
+        """).fetchall()
+
+        daily_clicks = conn.execute("""
+            SELECT substr(timestamp,1,10) AS day, COUNT(*) AS cnt
+            FROM clicks
+            GROUP BY day
+            ORDER BY day DESC
+            LIMIT 14
+        """).fetchall()
+
+    # Build view models
+    per_qr_rows = []
+    for r in per_qr:
+        d = dict(r)
+        d["created_local"] = time_ist(d["created_at"]) if d.get("created_at") else ""
+        scans = d.get("scans", 0) or 0
+        clicks = d.get("clicks", 0) or 0
+        d["ctr"] = f"{(clicks / scans * 100):.1f}%" if scans > 0 else "—"
+        per_qr_rows.append(d)
+
+    # Overall CTR
+    overall_ctr = f"{(total_clicks / total_scans * 100):.1f}%" if total_scans > 0 else "—"
+
+    # Pack daily rows as simple lists
+    daily_scans_list = [dict(x) for x in daily_scans]
+    daily_clicks_list = [dict(x) for x in daily_clicks]
+
+    return render_template(
+        "analytics.html",
+        total_qrs=total_qrs,
+        total_scans=total_scans,
+        total_clicks=total_clicks,
+        overall_ctr=overall_ctr,
+        per_qr_rows=per_qr_rows,
+        daily_scans=daily_scans_list,
+        daily_clicks=daily_clicks_list
     )
 
 # -------------------

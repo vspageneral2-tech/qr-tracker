@@ -1,15 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>QR Tracker</title>
-</head>
-<body>
-  <h1>QR Tracker</h1>
-  <p><a href="/generate">Generate a QR</a></p>
-  <p><a href="/admin">Admin dashboard</a></p>
-  <p style="color:#666;font-size:14px;">
-    Tip: This system logs each scan with IP, city, region, country, device, OS, browser.
+{% extends "base.html" %}
+{% block title %}Home – Kurukshetra Smart Cards{% endblock %}
+
+{% block content %}
+  <h1>Welcome</h1>
+  <p class="muted">Generate trackable QR codes and view scan & click analytics.</p>
+  <p>
+    <a class="btn" href="/generate">Generate QR</a>
+    <a class="btn" href="/admin">Admin Dashboard</a>
   </p>
-</body>
-</html>
+{% endblock %}

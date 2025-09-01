@@ -1,45 +1,49 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Generate QR</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Generate QR – Kurukshetra Smart Cards{% endblock %}
+
+{% block content %}
   <h1>Create a QR</h1>
+  <div class="card">
+    <form action="/generate" method="post">
+      <p>
+        <label><strong>QR Name/Label</strong><br>
+          <input type="text" name="label" placeholder="e.g., Mall Poster Sep-2025" required style="width:360px;padding:8px;border-radius:6px;border:1px solid #ccc;">
+        </label>
+      </p>
 
-  <form action="/generate" method="post">
-    <p>
-      <label>QR Name/Label:
-        <input type="text" name="label" placeholder="e.g., Mall Poster Sep-2025" required>
-      </label>
-    </p>
+      <h3>Links to show (up to 3)</h3>
+      <p>
+        <input type="text" name="text1" placeholder="Link 1 text" required
+               style="width:180px;padding:8px;border-radius:6px;border:1px solid #ccc;">
+        <input type="url"  name="url1"  placeholder="https://example.com/a" required
+               style="width:420px;padding:8px;border-radius:6px;border:1px solid #ccc;">
+      </p>
+      <p>
+        <input type="text" name="text2" placeholder="Link 2 text"
+               style="width:180px;padding:8px;border-radius:6px;border:1px solid #ccc;">
+        <input type="url"  name="url2"  placeholder="https://example.com/b"
+               style="width:420px;padding:8px;border-radius:6px;border:1px solid #ccc;">
+      </p>
+      <p>
+        <input type="text" name="text3" placeholder="Link 3 text"
+               style="width:180px;padding:8px;border-radius:6px;border:1px solid #ccc;">
+        <input type="url"  name="url3"  placeholder="https://example.com/c"
+               style="width:420px;padding:8px;border-radius:6px;border:1px solid #ccc;">
+      </p>
 
-    <h3>Links to show (up to 3)</h3>
-    <p>
-      <input type="text" name="text1" placeholder="Link 1 text" required>
-      <input type="url"  name="url1"  placeholder="https://example.com/a" required style="width:360px">
-    </p>
-    <p>
-      <input type="text" name="text2" placeholder="Link 2 text">
-      <input type="url"  name="url2"  placeholder="https://example.com/b" style="width:360px">
-    </p>
-    <p>
-      <input type="text" name="text3" placeholder="Link 3 text">
-      <input type="url"  name="url3"  placeholder="https://example.com/c" style="width:360px">
-    </p>
-
-    <button type="submit">Generate</button>
-  </form>
+      <button type="submit" class="btn">Generate</button>
+      <a class="btn" href="/admin" style="margin-left:8px;">Admin</a>
+      <a class="btn" href="/qr-list" style="margin-left:8px;">Saved QRs</a>
+    </form>
+  </div>
 
   {% if img_path %}
-    <hr>
-    <h2>Your QR</h2>
-    <img src="{{ img_path }}" alt="QR" style="width:260px;height:260px;border:1px solid #ccc;">
-    <p>Tracking URL: <a href="{{ scan_url }}">{{ scan_url }}</a></p>
-    <p><strong>QR Label:</strong> {{ label }}</p>
-    <p><a href="/qr-list">See all saved QRs</a></p>
+    <h2 style="margin-top:26px;">Your QR</h2>
+    <div class="card">
+      <img src="{{ img_path }}" alt="QR" style="width:260px;height:260px;border:1px solid #ccc;border-radius:8px;">
+      <p class="muted" style="margin-top:10px;">Tracking URL: <a href="{{ scan_url }}" target="_blank">{{ scan_url }}</a></p>
+      <p><strong>QR Label:</strong> {{ label }}</p>
+      <p><a class="btn" href="/qr-list">See all saved QRs</a></p>
+    </div>
   {% endif %}
-
-  <p><a href="/">Home</a> | <a href="/admin">Admin</a> | <a href="/qr-list">Saved QRs</a></p>
-</body>
-</html>
+{% endblock %}

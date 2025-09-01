@@ -1,15 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Select a Link</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Select a Link – Kurukshetra Smart Cards{% endblock %}
+
+{% block content %}
   <h1>Select a Link</h1>
-  <ul>
-    {% for link in links %}
-      <li><a href="{{ link.url }}">{{ link.text }}</a></li>
-    {% endfor %}
-  </ul>
-</body>
-</html>
+  <div class="card">
+    <ul>
+      {% for link in links %}
+        <li style="margin:10px 0;">
+          <a class="btn" href="{{ link.url }}">{{ link.text }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}
