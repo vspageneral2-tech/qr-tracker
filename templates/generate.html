@@ -8,9 +8,26 @@
   <h1>Create a QR</h1>
 
   <form action="/generate" method="post">
-    <label>QR Name/Label:
-      <input type="text" name="label" placeholder="e.g., Mall Poster Sep-2025" required>
-    </label>
+    <p>
+      <label>QR Name/Label:
+        <input type="text" name="label" placeholder="e.g., Mall Poster Sep-2025" required>
+      </label>
+    </p>
+
+    <h3>Links to show (up to 3)</h3>
+    <p>
+      <input type="text" name="text1" placeholder="Link 1 text" required>
+      <input type="url"  name="url1"  placeholder="https://example.com/a" required style="width:360px">
+    </p>
+    <p>
+      <input type="text" name="text2" placeholder="Link 2 text">
+      <input type="url"  name="url2"  placeholder="https://example.com/b" style="width:360px">
+    </p>
+    <p>
+      <input type="text" name="text3" placeholder="Link 3 text">
+      <input type="url"  name="url3"  placeholder="https://example.com/c" style="width:360px">
+    </p>
+
     <button type="submit">Generate</button>
   </form>
 
@@ -20,8 +37,9 @@
     <img src="{{ img_path }}" alt="QR" style="width:260px;height:260px;border:1px solid #ccc;">
     <p>Tracking URL: <a href="{{ scan_url }}">{{ scan_url }}</a></p>
     <p><strong>QR Label:</strong> {{ label }}</p>
+    <p><a href="/qr-list">See all saved QRs</a></p>
   {% endif %}
 
-  <p><a href="/">Home</a> | <a href="/admin">Admin</a></p>
+  <p><a href="/">Home</a> | <a href="/admin">Admin</a> | <a href="/qr-list">Saved QRs</a></p>
 </body>
 </html>

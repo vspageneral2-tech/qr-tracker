@@ -3,52 +3,97 @@
 <head>
   <meta charset="utf-8">
   <title>Admin Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1, h2 { margin: 12px 0; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }
+    th, td { border: 1px solid #ccc; padding: 8px; vertical-align: top; }
+    th { background: #f7f7f7; }
+    .nowrap { white-space: nowrap; }
+  </style>
 </head>
 <body>
   <h1>Admin Dashboard</h1>
 
-  <h2>Scans</h2>
-  <table border="1" cellspacing="0" cellpadding="6">
+  <!-- Saved QRs -->
+  <h2>Saved QRs</h2>
+  {% if qr_items %}
+  <table>
     <tr>
-      <th>ID</th><th>QR Label</th><th>Scan ID</th><th>Time</th><th>IP</th>
+      <th>Label</th>
+      <th>Scan ID</th>
+      <th>Created (IST)</th>
+      <th>Links</th>
+      <th>QR Image</th>
+      <th>Scan URL</th>
+    </tr>
+    {% for item in qr_items %}
+    <tr>
+      <td>{{ item["qr_label"] or "" }}</td>
+      <td class="nowrap">{{ item["scan_id"] }}</td>
+      <td class="nowrap">{{ item["created_local"] }}</td>
+      <td>
+        {% for l in item["links"] %}
+          <div>{{ l["text"] }} → <a href="{{ l["target"] }}" target="_blank">{{ l["target"] }}</a></div>
+        {% endfor %}
+      </td>
+      <td>
+        {% if item["qr_image_path"] %}
+          <img src="/{{ item['qr_image_path'] }}" alt="qr" style="width:120px;height:120px;border:1px solid #ccc;">
+        {% endif %}
+      </td>
+      <td style="max-width:420px;overflow-wrap:anywhere">
+        <a href="{{ item['scan_url'] }}" target="_blank">{{ item['scan_url'] }}</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+    <p>No QRs created yet. <a href="/generate">Create one</a>.</p>
+  {% endif %}
+
+  <!-- Scans -->
+  <h2>Scans</h2>
+  <table>
+    <tr>
+      <th>ID</th><th>QR Label</th><th>Scan ID</th><th>Time (IST)</th><th>IP</th>
       <th>City</th><th>Region</th><th>Country</th><th>Lat</th><th>Lon</th>
       <th>Device</th><th>OS</th><th>Browser</th><th>User Agent</th>
     </tr>
     {% for s in scans %}
     <tr>
-      <td>{{ s[0] }}</td>   <!-- id -->
-      <td>{{ s[2] or '' }}</td>   <!-- qr_label -->
-      <td>{{ s[1] }}</td>   <!-- scan_id -->
-      <td>{{ s[3] }}</td>   <!-- timestamp -->
-      <td>{{ s[4] }}</td>   <!-- ip -->
-      <td>{{ s[10] or '' }}</td>  <!-- city -->
-      <td>{{ s[11] or '' }}</td>  <!-- region -->
-      <td>{{ s[12] or '' }}</td>  <!-- country -->
-      <td>{{ s[13] or '' }}</td>  <!-- lat -->
-      <td>{{ s[14] or '' }}</td>  <!-- lon -->
-      <td>{{ s[6] or '' }}</td>   <!-- device_family -->
-      <td>{{ s[7] or '' }}</td>   <!-- os_family -->
-      <td>{{ s[8] or '' }}</td>   <!-- browser_family -->
-      <td style="max-width:420px;overflow-wrap:anywhere">{{ s[5] }}</td> <!-- user_agent -->
+      <td>{{ s["id"] }}</td>
+      <td>{{ s["qr_label"] or "" }}</td>
+      <td class="nowrap">{{ s["scan_id"] }}</td>
+      <td class="nowrap">{{ s["time_local"] }}</td>
+      <td class="nowrap">{{ s["ip"] }}</td>
+      <td>{{ s["city"] or "" }}</td>
+      <td>{{ s["region"] or "" }}</td>
+      <td>{{ s["country"] or "" }}</td>
+      <td>{{ s["lat"] or "" }}</td>
+      <td>{{ s["lon"] or "" }}</td>
+      <td>{{ s["device_family"] or "" }}</td>
+      <td>{{ s["os_family"] or "" }}</td>
+      <td>{{ s["browser_family"] or "" }}</td>
+      <td style="max-width:420px;overflow-wrap:anywhere">{{ s["user_agent"] }}</td>
     </tr>
     {% endfor %}
   </table>
 
-  <h2 style="margin-top:30px;">Clicks</h2>
-  <table border="1" cellspacing="0" cellpadding="6">
-    <tr><th>ID</th><th>Scan ID</th><th>Link</th><th>Time</th></tr>
+  <!-- Clicks -->
+  <h2>Clicks</h2>
+  <table>
+    <tr><th>ID</th><th>Scan ID</th><th>Link</th><th>Time (IST)</th></tr>
     {% for c in clicks %}
     <tr>
-      <td>{{ c[0] }}</td>
-      <td>{{ c[1] }}</td>
-      <td style="max-width:380px;overflow-wrap:anywhere">{{ c[2] }}</td>
-      <td>{{ c[3] }}</td>
+      <td>{{ c["id"] }}</td>
+      <td class="nowrap">{{ c["scan_id"] }}</td>
+      <td style="max-width:420px;overflow-wrap:anywhere">{{ c["link"] }}</td>
+      <td class="nowrap">{{ c["time_local"] }}</td>
     </tr>
     {% endfor %}
   </table>
 
-  <p style="margin-top:20px;">
-    <a href="/generate">Generate another QR</a> | <a href="/">Home</a>
-  </p>
+  <p><a href="/generate">Generate new QR</a> | <a href="/">Home</a></p>
 </body>
 </html>
