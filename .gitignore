@@ -1,0 +1,15 @@
+# Python cache / env
+__pycache__/
+.venv/
+.idea/
+*.pyc
+
+# Local data
+db.sqlite
+
+# Generated QR images
+static/qrs/*.png
+
+# OS files
+.DS_Store
+Thumbs.db

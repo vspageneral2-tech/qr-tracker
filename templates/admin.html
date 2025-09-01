@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Admin Dashboard</title></head>
+<body>
+  <h1>Admin Dashboard</h1>
+
+  <h2>Scans</h2>
+  <table border="1" cellspacing="0" cellpadding="6">
+    <tr>
+      <th>ID</th><th>Scan ID</th><th>Time</th><th>IP</th><th>User Agent</th>
+      <th>City</th><th>Region</th><th>Country</th><th>Lat</th><th>Lon</th>
+    </tr>
+    {% for s in scans %}
+    <tr>
+      <td>{{ s[0] }}</td>
+      <td>{{ s[1] }}</td>
+      <td>{{ s[2] }}</td>
+      <td>{{ s[3] }}</td>
+      <td style="max-width:300px;overflow-wrap:anywhere">{{ s[4] }}</td>
+      <td>{{ s[5] or '' }}</td>
+      <td>{{ s[6] or '' }}</td>
+      <td>{{ s[7] or '' }}</td>
+      <td>{{ s[8] or '' }}</td>
+      <td>{{ s[9] or '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h2 style="margin-top:30px;">Clicks</h2>
+  <table border="1" cellspacing="0" cellpadding="6">
+    <tr><th>ID</th><th>Scan ID</th><th>Link</th><th>Time</th></tr>
+    {% for c in clicks %}
+    <tr>
+      <td>{{ c[0] }}</td>
+      <td>{{ c[1] }}</td>
+      <td style="max-width:380px;overflow-wrap:anywhere">{{ c[2] }}</td>
+      <td>{{ c[3] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <p style="margin-top:20px;"><a href="/generate">Generate another QR</a> | <a href="/">Home</a></p>
+</body>
+</html>

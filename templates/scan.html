@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Select a Link</title></head>
+<body>
+  <h1>Select a Link</h1>
+  <ul>
+    {% for link in links %}
+      <li><a href="{{ link.url }}">{{ link.text }}</a></li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
