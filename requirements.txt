@@ -3,3 +3,4 @@ qrcode
 pillow
 requests
 gunicorn
+user-agents

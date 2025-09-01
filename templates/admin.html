@@ -1,27 +1,35 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Admin Dashboard</title></head>
+<head>
+  <meta charset="utf-8">
+  <title>Admin Dashboard</title>
+</head>
 <body>
   <h1>Admin Dashboard</h1>
 
   <h2>Scans</h2>
   <table border="1" cellspacing="0" cellpadding="6">
     <tr>
-      <th>ID</th><th>Scan ID</th><th>Time</th><th>IP</th><th>User Agent</th>
+      <th>ID</th><th>QR Label</th><th>Scan ID</th><th>Time</th><th>IP</th>
       <th>City</th><th>Region</th><th>Country</th><th>Lat</th><th>Lon</th>
+      <th>Device</th><th>OS</th><th>Browser</th><th>User Agent</th>
     </tr>
     {% for s in scans %}
     <tr>
-      <td>{{ s[0] }}</td>
-      <td>{{ s[1] }}</td>
-      <td>{{ s[2] }}</td>
-      <td>{{ s[3] }}</td>
-      <td style="max-width:300px;overflow-wrap:anywhere">{{ s[4] }}</td>
-      <td>{{ s[5] or '' }}</td>
-      <td>{{ s[6] or '' }}</td>
-      <td>{{ s[7] or '' }}</td>
-      <td>{{ s[8] or '' }}</td>
-      <td>{{ s[9] or '' }}</td>
+      <td>{{ s[0] }}</td>   <!-- id -->
+      <td>{{ s[2] or '' }}</td>   <!-- qr_label -->
+      <td>{{ s[1] }}</td>   <!-- scan_id -->
+      <td>{{ s[3] }}</td>   <!-- timestamp -->
+      <td>{{ s[4] }}</td>   <!-- ip -->
+      <td>{{ s[10] or '' }}</td>  <!-- city -->
+      <td>{{ s[11] or '' }}</td>  <!-- region -->
+      <td>{{ s[12] or '' }}</td>  <!-- country -->
+      <td>{{ s[13] or '' }}</td>  <!-- lat -->
+      <td>{{ s[14] or '' }}</td>  <!-- lon -->
+      <td>{{ s[6] or '' }}</td>   <!-- device_family -->
+      <td>{{ s[7] or '' }}</td>   <!-- os_family -->
+      <td>{{ s[8] or '' }}</td>   <!-- browser_family -->
+      <td style="max-width:420px;overflow-wrap:anywhere">{{ s[5] }}</td> <!-- user_agent -->
     </tr>
     {% endfor %}
   </table>
@@ -39,6 +47,8 @@
     {% endfor %}
   </table>
 
-  <p style="margin-top:20px;"><a href="/generate">Generate another QR</a> | <a href="/">Home</a></p>
+  <p style="margin-top:20px;">
+    <a href="/generate">Generate another QR</a> | <a href="/">Home</a>
+  </p>
 </body>
 </html>
